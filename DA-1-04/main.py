@@ -9,42 +9,47 @@ def is_numeric_dataframe(df):
     Returns:
         bool: True, если все столбцы числовые, False в противном случае
     """
-    return all(df.dtypes != 'object')
+    return all(pd.api.types.is_numeric_dtype(df[col]) for col in df.columns)
+
 
 def load_data_from_file(filename):
     """
-    Загружает DataFrame из CSV-файла
+    Загружает DataFrame из CSV-файла и возвращает названия столбцов.
     Args:
-        filename: Имя файла для загрузки
+        filename: Имя файла для загрузки.
     Returns:
-        pd.DataFrame: Загруженный DataFrame, или None, если произошла ошибка
+        tuple: (pd.DataFrame, list) Загруженный DataFrame и список названий столбцов,
+               или (None, None) в случае ошибки.
     """
     try:
         df = pd.read_csv(filename)
-        return df
+        if df is not None and not df.empty:
+            column = df.columns[0]
+            return df, column
+        else:
+            print(f"Загруженный DataFrame пуст.")
+            return None, None
     except Exception as e:
         print(f"Не удалось загрузить данные из файла {filename}: {e}")
-        return None
+        return None, None
 
 
-def generate_synthetic_data(categories_list, num_samples, seed):
+def generate_synthetic_data(categories_list, category_column, num_samples, seed):
     """Генерирует синтетический датасет."""
     np.random.seed(seed)
     categories = np.random.choice(categories_list, size=num_samples)
-    df = pd.DataFrame({'category': categories})
+    df = pd.DataFrame({category_column: categories})
     return df
 
 
-def process_dataframe(df, categories_list, num_samples, seed):
+def process_dataframe(df, category_column):
 
     """
-    Генерирует или загружает DataFrame, кодирует категориальные признаки и
+    Кодирует категориальные признаки и
     проверяет типы данных
     Args:
         df (pd.DataFrame or None): Исходный DataFrame
-        categories_list (list): Список категорий для генерации или кодирования
-        num_samples (int): Количество образцов для генерации
-        seed (int): зерно для случайных чисел
+        category_column (str): Название столбца с категориальными данными
     Returns:
         tuple: Кортеж из (исходного DataFrame, закодированного DataFrame),
                или (None, None) в случае неудачи
@@ -52,18 +57,10 @@ def process_dataframe(df, categories_list, num_samples, seed):
         ValueError: Если входные параметры некорректны
     """
 
-    if df is None:
-        if not categories_list:
-            raise ValueError("categories_list не может быть пустым при генерации данных")
-        if num_samples <= 0:
-            raise ValueError("num_samples должно быть больше нуля при генерации данных")
-        df = generate_synthetic_data(categories_list, num_samples, seed)
+    if category_column not in df.columns:
+        raise ValueError(f"DataFrame должен содержать столбец '{category_column}'")
 
-    if 'category' not in df.columns:
-        raise ValueError("DataFrame должен содержать столбец 'category'")
-
-
-    df_encoded = pd.get_dummies(df, columns=['category'])
+    df_encoded = pd.get_dummies(df, columns=[category_column])
     df_encoded = df_encoded.astype(int)
 
     if not is_numeric_dataframe(df_encoded):
@@ -91,12 +88,13 @@ def save_dataframe_to_file(df, filename, index=False):
 
 
 
-def process_data(categories_list=None, num_samples=100, filename=None, save_filename='processed_data.csv', seed=123):
+def process_data(categories_list=None, category_column = 'category', num_samples=100, filename=None, save_filename='processed_data.csv', seed=123):
     """
     Главная функция для генерации, загрузки, обработки и сохранения датасета
 
     Args:
         categories_list (list): Список возможных значений для категориального признака
+        category_column (str): Название столбца с категориальными данными
         num_samples (int): Количество строк в генерируемом датасете
         filename (str, optional): Имя файла для загрузки датасета
         save_filename (str, optional): Имя файла для сохранения закодированного датасета
@@ -105,10 +103,16 @@ def process_data(categories_list=None, num_samples=100, filename=None, save_file
 
     df = None
     if filename:
-        df = load_data_from_file(filename)
+        df, category_column = load_data_from_file(filename)
+    else:
+        if not categories_list:
+            raise ValueError("categories_list не может быть пустым при генерации данных")
+        if num_samples <= 0:
+            raise ValueError("num_samples должно быть больше нуля при генерации данных")
+        df = generate_synthetic_data(categories_list, category_column, num_samples, seed)
 
     try:
-        original_data, encoded_data = process_dataframe(df, categories_list, num_samples, seed)
+        original_data, encoded_data = process_dataframe(df, category_column)
     except ValueError as e:
         print(f"Генерация не удалась: {e}")
         original_data, encoded_data = None, None
@@ -121,5 +125,5 @@ def process_data(categories_list=None, num_samples=100, filename=None, save_file
         
 
 if __name__ == "__main__":
-    process_data(categories_list=['red', 'blue', 'green', 'black', 'grey'], num_samples=10, save_filename='encoded_synthetic_data.csv')
+    process_data(categories_list=['red', 'blue', 'green'], category_column = 'test', num_samples=10, save_filename='encoded_synthetic_data.csv')
 

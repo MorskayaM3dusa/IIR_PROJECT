@@ -30,4 +30,5 @@
 
 ### Пример запуска
 
-`python main.py --source video.mp4 --min_area 1000 --max_area 20000 --output processed.mp4 --stats stats.txt`
+```bash
+python main.py --source video.mp4 --min_area 1000 --max_area 20000 --output processed.mp4 --stats stats.txt
